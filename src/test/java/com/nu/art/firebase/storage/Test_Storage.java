@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.nu.art.core.exceptions.runtime.BadImplementationException;
 import com.nu.art.core.tools.FileTools;
 import com.nu.art.core.tools.StreamTools;
+import com.nu.art.firebase.storage.Module_FirebaseStorage.CompletionListener;
 import com.nu.art.firebase.storage.Module_FirebaseStorage.DownloadListener;
 import com.nu.art.firebase.storage.Module_FirebaseStorage.FirebaseBucket;
 import com.nu.art.firebase.storage.Module_FirebaseStorage.FirebaseBucket.DownloadTransaction;
@@ -70,23 +71,26 @@ public class Test_Storage
 		final File origin = new File(resPath, "sample-image.jpg");
 		final UploadTransaction transaction = bucket.createUploadTransaction("test/sample-image.jpg");
 		transaction.setContentType("image/jpg");
+		transaction.setCompletionListener(new CompletionListener() {
+			@Override
+			public void onCompleted() {
+				synchronized (lock) {
+					lock.notify();
+				}
+			}
+		});
+
 		transaction.execute(new UploadListener() {
 			@Override
 			public void onUpload(OutputStream os, Throwable t)
 				throws IOException {
 				if (t != null) {
 					logError("Error uploading file", t);
-					synchronized (lock) {
-						lock.notify();
-					}
 					return;
 				}
 
 				try {
 					StreamTools.copy(origin, os);
-					synchronized (lock) {
-						lock.notify();
-					}
 				} catch (IOException e) {
 					throw e;
 				}
@@ -107,23 +111,25 @@ public class Test_Storage
 
 		final Object lock = new Object();
 		DownloadTransaction downloadTransaction = bucket.createDownloadTransaction("test/sample-image.jpg");
+		downloadTransaction.setCompletionListener(new CompletionListener() {
+			@Override
+			public void onCompleted() {
+				synchronized (lock) {
+					lock.notify();
+				}
+			}
+		});
 		downloadTransaction.execute(new DownloadListener() {
 			@Override
 			public void onDownload(InputStream is, Throwable t)
 				throws IOException {
 				if (t != null) {
 					logError("Error uploading file", t);
-					synchronized (lock) {
-						lock.notify();
-					}
 					return;
 				}
 
 				try {
 					StreamTools.copy(is, new File(outputPath, "sample-image.jpg"));
-					synchronized (lock) {
-						lock.notify();
-					}
 				} catch (IOException e) {
 					throw e;
 				}

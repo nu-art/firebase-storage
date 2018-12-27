@@ -35,6 +35,11 @@ public class Module_FirebaseStorage
 			throws IOException;
 	}
 
+	public interface CompletionListener {
+
+		void onCompleted();
+	}
+
 	public class FirebaseBucket {
 
 		public class UploadTransaction {
@@ -42,10 +47,16 @@ public class Module_FirebaseStorage
 			private String relativePathInBucket;
 			private String contentType;
 			private BlobTargetOption[] targetOptions = {};
-			private UploadListener listener;
+			private UploadListener uploadListener;
+			private CompletionListener completionListener;
 
 			public UploadTransaction setRelativePathInBucket(String relativePathInBucket) {
 				this.relativePathInBucket = relativePathInBucket;
+				return this;
+			}
+
+			public final UploadTransaction setCompletionListener(CompletionListener completionListener) {
+				this.completionListener = completionListener;
 				return this;
 			}
 
@@ -58,7 +69,7 @@ public class Module_FirebaseStorage
 				if (listener == null)
 					throw new ImplementationMissingException("MUST provide upload listener");
 
-				this.listener = listener;
+				this.uploadListener = listener;
 
 				if (!uploadQueue.isAlive())
 					throw new BadImplementationException("MUST initialize the bucket first");
@@ -70,17 +81,17 @@ public class Module_FirebaseStorage
 			private void execute() {
 				WriteChannel writer = null;
 				try {
-					Builder builder = BlobInfo.newBuilder(name, relativePathInBucket);
+					Builder builder = BlobInfo.newBuilder(bucketName, relativePathInBucket);
 					if (contentType != null)
 						builder.setContentType(contentType);
 
 					BlobInfo blobInfo = builder.build();
 					Blob blob = storage.create(blobInfo, targetOptions);
 					writer = blob.writer();
-					listener.onUpload(Channels.newOutputStream(writer), null);
+					uploadListener.onUpload(Channels.newOutputStream(writer), null);
 				} catch (Throwable t) {
 					try {
-						listener.onUpload(null, t);
+						uploadListener.onUpload(null, t);
 					} catch (Throwable e) {
 						logError("Error while handling error", e);
 					}
@@ -91,13 +102,21 @@ public class Module_FirebaseStorage
 						} catch (IOException ignore) {}
 					}
 				}
+				if (completionListener != null)
+					completionListener.onCompleted();
 			}
 		}
 
 		public class DownloadTransaction {
 
 			private String relativePathInBucket;
-			private DownloadListener listener;
+			private DownloadListener downloadListener;
+			private CompletionListener completionListener;
+
+			public final DownloadTransaction setCompletionListener(CompletionListener completionListener) {
+				this.completionListener = completionListener;
+				return this;
+			}
 
 			public DownloadTransaction setRelativePathInBucket(String relativePathInBucket) {
 				this.relativePathInBucket = relativePathInBucket;
@@ -111,7 +130,7 @@ public class Module_FirebaseStorage
 				if (!downloadQueue.isAlive())
 					throw new BadImplementationException("MUST initialize the bucket first");
 
-				this.listener = listener;
+				this.downloadListener = listener;
 
 				downloadQueue.addItem(this);
 				return this;
@@ -120,11 +139,11 @@ public class Module_FirebaseStorage
 			private void execute() {
 				ReadChannel reader = null;
 				try {
-					reader = storage.reader(name, relativePathInBucket);
-					listener.onDownload(Channels.newInputStream(reader), null);
+					reader = storage.reader(bucketName, relativePathInBucket);
+					downloadListener.onDownload(Channels.newInputStream(reader), null);
 				} catch (Throwable e) {
 					try {
-						listener.onDownload(null, e);
+						downloadListener.onDownload(null, e);
 					} catch (Exception e1) {
 						logError("Error while handling error", e);
 					}
@@ -132,10 +151,12 @@ public class Module_FirebaseStorage
 					if (reader != null)
 						reader.close();
 				}
+				if (completionListener != null)
+					completionListener.onCompleted();
 			}
 		}
 
-		private final String name;
+		private final String bucketName;
 
 		private PoolQueue<UploadTransaction> uploadQueue = new PoolQueue<UploadTransaction>() {
 			@Override
@@ -151,17 +172,17 @@ public class Module_FirebaseStorage
 			}
 		};
 
-		public FirebaseBucket(String name) {
-			this.name = name;
+		public FirebaseBucket(String bucketName) {
+			this.bucketName = bucketName;
 		}
 
 		public FirebaseBucket setUploadThreadCount(int uploadThreadCount) {
-			uploadQueue.createThreads("bucket-upload-" + name + "");
+			uploadQueue.createThreads("bucket-upload-" + bucketName + "");
 			return this;
 		}
 
 		public FirebaseBucket setDownloadThreadCount(int downloadThreadCount) {
-			downloadQueue.createThreads("bucket-upload-" + name + "");
+			downloadQueue.createThreads("bucket-upload-" + bucketName + "");
 			return this;
 		}
 
