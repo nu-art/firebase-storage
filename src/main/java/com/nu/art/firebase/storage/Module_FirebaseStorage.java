@@ -11,6 +11,7 @@ import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.StorageOptions;
 import com.nu.art.core.exceptions.runtime.BadImplementationException;
 import com.nu.art.core.exceptions.runtime.ImplementationMissingException;
+import com.nu.art.core.interfaces.Getter;
 import com.nu.art.core.utils.PoolQueue;
 import com.nu.art.modular.core.Module;
 
@@ -177,12 +178,12 @@ public class Module_FirebaseStorage
 		}
 
 		public FirebaseBucket setUploadThreadCount(int uploadThreadCount) {
-			uploadQueue.createThreads("bucket-upload-" + bucketName + "");
+			uploadQueue.createThreads("bucket-upload-" + bucketName + "", uploadThreadCount);
 			return this;
 		}
 
 		public FirebaseBucket setDownloadThreadCount(int downloadThreadCount) {
-			downloadQueue.createThreads("bucket-upload-" + bucketName + "");
+			downloadQueue.createThreads("bucket-upload-" + bucketName + "", downloadThreadCount);
 			return this;
 		}
 
@@ -197,14 +198,15 @@ public class Module_FirebaseStorage
 
 	private Storage storage;
 	private HashMap<String, FirebaseBucket> buckets = new HashMap<>();
-	private GoogleCredentials credentials;
+	private Getter<GoogleCredentials> credentialsGetter;
 
-	public void setCredentials(GoogleCredentials credentials) {
-		this.credentials = credentials;
+	public void setCredentialsGetter(Getter<GoogleCredentials> credentialsGetter) {
+		this.credentialsGetter = credentialsGetter;
 	}
 
 	public void connect() {
 		try {
+			GoogleCredentials credentials = credentialsGetter.get();
 			storage = StorageOptions.newBuilder().setCredentials(credentials).build().getService();
 		} catch (Throwable e) {
 			throw new BadImplementationException("Unable to stare storage", e);
@@ -213,8 +215,6 @@ public class Module_FirebaseStorage
 
 	@Override
 	protected void init() {
-		if (credentials != null)
-			connect();
 	}
 
 	public final FirebaseBucket getOrCreateBucket(String name) {
