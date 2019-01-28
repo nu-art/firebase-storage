@@ -2,21 +2,21 @@ package com.nu.art.firebase.storage;
 
 import org.junit.Test;
 
-public class Test_Storage
+public class Test_FirebaseStorage
 	extends Test_StorageBase {
 
 	@Test
 	public void uploadFile() {
-		AsyncScenario testGroup = createAsyncScenario();
-		testGroup.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test/sample-image.jpg"));
-		testGroup.execute();
+		createAsyncScenario()
+			.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test/sample-image.jpg"))
+			.execute();
 	}
 
 	@Test
 	public void downloadFile() {
-		AsyncScenario testGroup = createAsyncScenario();
-		testGroup.addTest(downloadFileTest("sample-image.jpg", "test/sample-image.jpg"));
-		testGroup.execute();
+		createAsyncScenario()
+			.addTest(downloadFileTest("sample-image.jpg", "test/sample-image.jpg"))
+			.execute();
 	}
 
 	@Test
@@ -28,15 +28,14 @@ public class Test_Storage
 			"sample-image-3.jpg"
 		};
 
-		Scenario testGroup = createScenario();
-
 		AsyncScenario uploadFiles = createAsyncScenario();
 		for (String file : files) {
 			uploadFiles.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test-list/" + file));
 		}
 
-		testGroup.addTest(uploadFiles);
-		testGroup.addTest(listFiles("test-list/", files));
-		testGroup.execute();
+		createScenario()
+			.addTest(uploadFiles)
+			.addTest(listFiles("test-list/", files))
+			.execute();
 	}
 }
