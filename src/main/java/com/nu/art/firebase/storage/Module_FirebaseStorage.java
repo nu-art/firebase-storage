@@ -7,6 +7,7 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobInfo.Builder;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobListOption;
 import com.google.cloud.storage.Storage.BlobTargetOption;
 import com.google.cloud.storage.StorageOptions;
 import com.nu.art.core.exceptions.runtime.BadImplementationException;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Module_FirebaseStorage
@@ -36,28 +38,100 @@ public class Module_FirebaseStorage
 			throws IOException;
 	}
 
+	public interface ListFilesListener {
+
+		void onReceivedFiles(RemoteFile[] entities, Throwable t)
+			throws IOException;
+	}
+
 	public interface CompletionListener {
 
 		void onCompleted();
 	}
 
+	public static class RemoteFile {
+
+		public String name;
+		public boolean isFolder;
+		public long size;
+
+		public RemoteFile setName(String name) {
+			this.name = name;
+			return this;
+		}
+
+		public RemoteFile setIsFolder(boolean folder) {
+			isFolder = folder;
+			return this;
+		}
+
+		public RemoteFile setSize(long size) {
+			this.size = size;
+			return this;
+		}
+
+		@Override
+		public String toString() {
+			return name;
+		}
+	}
+
 	public class FirebaseBucket {
 
-		public class UploadTransaction {
+		public class ListFiles
+			extends Transaction<ListFiles, ListFilesListener> {
+
+			private String relativePathInBucket;
+
+			public ListFiles setRelativePathInBucket(String relativePathInBucket) {
+				this.relativePathInBucket = relativePathInBucket;
+				return this;
+			}
+
+			@Override
+			ListFiles execute(ListFilesListener listener) {
+				try {
+					Iterable<Blob> filesAsBlobs = storage.get(bucketName).list(BlobListOption.prefix(relativePathInBucket)).getValues();
+					ArrayList<RemoteFile> remoteFiles = new ArrayList<>();
+
+					for (Blob blob : filesAsBlobs) {
+						if (blob == null)
+							continue;
+
+						if (blob.getName().equals(relativePathInBucket + "/"))
+							continue;
+
+						remoteFiles.add(new RemoteFile().setIsFolder(blob.isDirectory()).setName(blob.getName()).setSize(blob.getSize()));
+					}
+
+					listener.onReceivedFiles(remoteFiles.toArray(new RemoteFile[0]), null);
+				} catch (Throwable t) {
+					try {
+						listener.onReceivedFiles(new RemoteFile[0], t);
+					} catch (Throwable e) {
+						logError("Error while handling error", e);
+					}
+				} finally {
+					// CLEAN UP ????
+				}
+
+				if (completionListener != null)
+					completionListener.onCompleted();
+
+				return this;
+			}
+		}
+
+		public class UploadTransaction
+			extends Transaction<UploadTransaction, UploadListener> {
 
 			private String relativePathInBucket;
 			private String contentType;
 			private BlobTargetOption[] targetOptions = {};
 			private UploadListener uploadListener;
-			private CompletionListener completionListener;
 
 			public UploadTransaction setRelativePathInBucket(String relativePathInBucket) {
 				this.relativePathInBucket = relativePathInBucket;
-				return this;
-			}
-
-			public final UploadTransaction setCompletionListener(CompletionListener completionListener) {
-				this.completionListener = completionListener;
 				return this;
 			}
 
@@ -108,16 +182,24 @@ public class Module_FirebaseStorage
 			}
 		}
 
-		public class DownloadTransaction {
+		@SuppressWarnings("unchecked")
+		public abstract class Transaction<T extends Transaction, ListenerType> {
+
+			CompletionListener completionListener;
+
+			public final T setCompletionListener(CompletionListener completionListener) {
+				this.completionListener = completionListener;
+				return (T) this;
+			}
+
+			abstract T execute(ListenerType listener);
+		}
+
+		public class DownloadTransaction
+			extends Transaction<DownloadTransaction, DownloadListener> {
 
 			private String relativePathInBucket;
 			private DownloadListener downloadListener;
-			private CompletionListener completionListener;
-
-			public final DownloadTransaction setCompletionListener(CompletionListener completionListener) {
-				this.completionListener = completionListener;
-				return this;
-			}
 
 			public DownloadTransaction setRelativePathInBucket(String relativePathInBucket) {
 				this.relativePathInBucket = relativePathInBucket;
@@ -185,6 +267,10 @@ public class Module_FirebaseStorage
 		public FirebaseBucket setDownloadThreadCount(int downloadThreadCount) {
 			downloadQueue.createThreads("bucket-upload-" + bucketName + "", downloadThreadCount);
 			return this;
+		}
+
+		public final ListFiles listFiles(String relativePathInBucket) {
+			return new ListFiles().setRelativePathInBucket(relativePathInBucket);
 		}
 
 		public final UploadTransaction createUploadTransaction(String relativePathInBucket) {

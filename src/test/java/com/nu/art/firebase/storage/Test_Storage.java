@@ -1,147 +1,42 @@
 package com.nu.art.firebase.storage;
 
-import com.google.auth.oauth2.GoogleCredentials;
-import com.nu.art.core.exceptions.runtime.BadImplementationException;
-import com.nu.art.core.tools.FileTools;
-import com.nu.art.core.tools.StreamTools;
-import com.nu.art.firebase.storage.Module_FirebaseStorage.CompletionListener;
-import com.nu.art.firebase.storage.Module_FirebaseStorage.DownloadListener;
-import com.nu.art.firebase.storage.Module_FirebaseStorage.FirebaseBucket;
-import com.nu.art.firebase.storage.Module_FirebaseStorage.FirebaseBucket.DownloadTransaction;
-import com.nu.art.firebase.storage.Module_FirebaseStorage.FirebaseBucket.UploadTransaction;
-import com.nu.art.firebase.storage.Module_FirebaseStorage.UploadListener;
-import com.nu.art.modular.core.ModulesPack;
-import com.nu.art.modular.tests.ModuleManager_TestClass;
-
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
 public class Test_Storage
-	extends ModuleManager_TestClass {
+	extends Test_StorageBase {
 
-	private static final String outputPath = "build/test/output";
-	private static final String resPath = "src/test/res";
-	private static FirebaseBucket bucket;
-
-	static class Pack
-		extends ModulesPack {
-
-		Pack() {
-			super(Module_FirebaseStorage.class);
-		}
-
-		@Override
-		protected void init() {
-			try {
-				String pathToCreds = resPath + "/dev-server-key.json";
-				GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(new File(pathToCreds)));
-				getModule(Module_FirebaseStorage.class).setCredentials(credentials);
-			} catch (IOException e) {
-				throw new BadImplementationException("unable to load credential file for storage test");
-			}
-		}
-	}
-
-	@BeforeClass
-	@SuppressWarnings("unchecked")
-	public static void setUp() {
-		initWithPacks(Pack.class);
-		bucket = getModule(Module_FirebaseStorage.class).getOrCreateBucket("test-fcm-fdcdc.appspot.com");
-		bucket.setUploadThreadCount(3);
-		bucket.setDownloadThreadCount(3);
-	}
-
-	@Before
-	public final void deleteOutput()
-		throws IOException {
-		FileTools.delete(new File(outputPath));
+	@Test
+	public void uploadFile() {
+		AsyncTestim<Boolean> testGroup = createTestGroup();
+		testGroup.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test/sample-image.jpg"));
+		testGroup.execute();
 	}
 
 	@Test
-	public final void uploadFile() {
-		final Object lock = new Object();
-
-		final File origin = new File(resPath, "sample-image.jpg");
-		final UploadTransaction transaction = bucket.createUploadTransaction("test/sample-image.jpg");
-		transaction.setContentType("image/jpg");
-		transaction.setCompletionListener(new CompletionListener() {
-			@Override
-			public void onCompleted() {
-				synchronized (lock) {
-					lock.notify();
-				}
-			}
-		});
-
-		transaction.execute(new UploadListener() {
-			@Override
-			public void onUpload(OutputStream os, Throwable t)
-				throws IOException {
-				if (t != null) {
-					logError("Error uploading file", t);
-					return;
-				}
-
-				try {
-					StreamTools.copy(origin, os);
-				} catch (IOException e) {
-					throw e;
-				}
-			}
-		});
-
-		synchronized (lock) {
-			try {
-				lock.wait();
-			} catch (InterruptedException e) {
-				logError(e);
-			}
-		}
+	public void downloadFile() {
+		AsyncTestim<Boolean> testGroup = createTestGroup();
+		testGroup.addTest(downloadFileTest("sample-image.jpg", "test/sample-image.jpg"));
+		testGroup.execute();
 	}
 
 	@Test
-	public final void downloadFile() {
+	public void checkList() {
+		String[] files = {
+			"sample-image-0.jpg",
+			"sample-image-1.jpg",
+			"sample-image-2.jpg",
+			"sample-image-3.jpg"
+		};
 
-		final Object lock = new Object();
-		DownloadTransaction downloadTransaction = bucket.createDownloadTransaction("test/sample-image.jpg");
-		downloadTransaction.setCompletionListener(new CompletionListener() {
-			@Override
-			public void onCompleted() {
-				synchronized (lock) {
-					lock.notify();
-				}
-			}
-		});
-		downloadTransaction.execute(new DownloadListener() {
-			@Override
-			public void onDownload(InputStream is, Throwable t)
-				throws IOException {
-				if (t != null) {
-					logError("Error uploading file", t);
-					return;
-				}
-
-				try {
-					StreamTools.copy(is, new File(outputPath, "sample-image.jpg"));
-				} catch (IOException e) {
-					throw e;
-				}
-			}
-		});
-
-		synchronized (lock) {
-			try {
-				lock.wait();
-			} catch (InterruptedException e) {
-				logError(e);
-			}
+		AsyncTestim<Boolean> testGroup = createTestGroup();
+		for (String file : files) {
+			testGroup.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test-list/" + file));
 		}
+
+		testGroup.execute();
+
+		AsyncTestim<Boolean> list = createTestGroup();
+		list.addTest(listFiles("test-list/", files));
+		list.execute();
 	}
 }
