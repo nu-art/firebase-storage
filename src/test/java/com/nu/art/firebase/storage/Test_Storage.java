@@ -7,14 +7,14 @@ public class Test_Storage
 
 	@Test
 	public void uploadFile() {
-		AsyncTestim<Boolean> testGroup = createTestGroup();
+		AsyncScenario testGroup = createAsyncScenario();
 		testGroup.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test/sample-image.jpg"));
 		testGroup.execute();
 	}
 
 	@Test
 	public void downloadFile() {
-		AsyncTestim<Boolean> testGroup = createTestGroup();
+		AsyncScenario testGroup = createAsyncScenario();
 		testGroup.addTest(downloadFileTest("sample-image.jpg", "test/sample-image.jpg"));
 		testGroup.execute();
 	}
@@ -28,15 +28,15 @@ public class Test_Storage
 			"sample-image-3.jpg"
 		};
 
-		AsyncTestim<Boolean> testGroup = createTestGroup();
+		Scenario testGroup = createScenario();
+
+		AsyncScenario uploadFiles = createAsyncScenario();
 		for (String file : files) {
-			testGroup.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test-list/" + file));
+			uploadFiles.addTest(uploadFileTest("sample-image.jpg", "image/jpg", "test-list/" + file));
 		}
 
+		testGroup.addTest(uploadFiles);
+		testGroup.addTest(listFiles("test-list/", files));
 		testGroup.execute();
-
-		AsyncTestim<Boolean> list = createTestGroup();
-		list.addTest(listFiles("test-list/", files));
-		list.execute();
 	}
 }

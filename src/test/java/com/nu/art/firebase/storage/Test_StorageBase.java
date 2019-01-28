@@ -79,12 +79,12 @@ public class Test_StorageBase
 		FileTools.delete(new File(outputPath));
 	}
 
-	protected AsyncTest<Boolean> uploadFileTest(final String pathToLocal, final String mimeType, final String remotePath) {
-		return createDefaultTest("UploadFile", "(" + mimeType + ")" + pathToLocal + " => " + remotePath)
+	protected TestItem<Boolean> uploadFileTest(final String pathToLocal, final String mimeType, final String remotePath) {
+		return createTest("UploadFile", "(" + mimeType + ")" + pathToLocal + " => " + remotePath)
 			.setTimeout(40000)
-			.setProcessor(new Processor<AsyncTest<Boolean>>() {
+			.setProcessor(new Processor<TestItem<Boolean>>() {
 				@Override
-				public void process(final AsyncTest<Boolean> test) {
+				public void process(final TestItem<Boolean> test) {
 					final File origin = new File(resPath, pathToLocal);
 					final UploadTransaction transaction = bucket.createUploadTransaction(remotePath);
 					transaction.setContentType(mimeType);
@@ -118,11 +118,11 @@ public class Test_StorageBase
 			});
 	}
 
-	protected AsyncTest<Boolean> downloadFileTest(final String pathToLocal, final String remotePath) {
-		return createDefaultTest("DownloadFile", remotePath + " => " + pathToLocal)
-			.setProcessor(new Processor<AsyncTest<Boolean>>() {
+	protected TestItem<Boolean> downloadFileTest(final String pathToLocal, final String remotePath) {
+		return createTest("DownloadFile", remotePath + " => " + pathToLocal)
+			.setProcessor(new Processor<TestItem<Boolean>>() {
 				@Override
-				public void process(final AsyncTest<Boolean> test) {
+				public void process(final TestItem<Boolean> test) {
 					DownloadTransaction transaction = bucket.createDownloadTransaction(remotePath);
 					transaction.setCompletionListener(new CompletionListener() {
 
@@ -153,11 +153,11 @@ public class Test_StorageBase
 			});
 	}
 
-	protected AsyncTest<Boolean> listFiles(final String remotePath, final String... expectedList) {
-		return createDefaultTest("ListFile", remotePath)
-			.setProcessor(new Processor<AsyncTest<Boolean>>() {
+	protected TestItem<Boolean> listFiles(final String remotePath, final String... expectedList) {
+		return createTest("ListFile", remotePath)
+			.setProcessor(new Processor<TestItem<Boolean>>() {
 				@Override
-				public void process(final AsyncTest<Boolean> test) {
+				public void process(final TestItem<Boolean> test) {
 					ListFiles transaction = bucket.listFiles(remotePath);
 					transaction.setCompletionListener(new CompletionListener() {
 
