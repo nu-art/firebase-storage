@@ -45,9 +45,10 @@ public class Test_StorageBase
 
 		@Override
 		protected void init() {
+			String home = System.getProperty("user.home");
+			File credsFile = new File(home, "keys/dev-server-key.json");
 			try {
-				String pathToCreds = resPath + "/dev-server-key.json";
-				final GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(new File(pathToCreds)));
+				final GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(credsFile));
 
 				Module_FirebaseStorage module = getModule(Module_FirebaseStorage.class);
 				module.DebugFlag.enable();
@@ -59,7 +60,7 @@ public class Test_StorageBase
 				});
 				module.connect();
 			} catch (IOException e) {
-				throw new BadImplementationException("unable to load credential file for storage test");
+				throw new BadImplementationException("unable to load credential file for storage test from: " + credsFile.getAbsolutePath());
 			}
 		}
 	}
